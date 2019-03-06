@@ -17,7 +17,6 @@ get '/building-permits' do
 		" AND deliveryaddress IS NOT NULL"+
 		" AND companyname IS NOT NULL")
 
-
 connection = Faraday.new(url: url.to_s)
 response = connection.get
 
