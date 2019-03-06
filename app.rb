@@ -1,42 +1,41 @@
-require 'dotenv';Dotenv.load
+require 'faraday'
 require 'sinatra'
-require 'rack/cors'
 
-$: << './lib'
-require 'spy_glass'
+#time_zone = ActiveSupport::TimeZone["Eastern Time (US & Canada)"]
 
-configure :production do
-  require 'newrelic_rpm'
-  require 'rack/ssl'
-  use Rack::SSL
-end
+get '/building-permits' do
+	url = URI('https://data.miamigov.com/resource/8vfk-ducx.json')
+	thisWeek = Date.today-7
+	url.query = Faraday::Utils.build_query(
+		'$order' => 'applicationnumber DESC',
+    		'$limit' => 1000,
+		'$where' => "applicationnumber IS NOT NULL" +
+		" AND statusdate IS NOT NULL" +
+		" AND statusdate > '#{thisWeek.iso8601}'" +
+		" AND buildingpermitstatusdescription = 'Active'"+
+		" AND issueddate IS NOT NULL"+
+		" AND deliveryaddress IS NOT NULL"+
+		" AND companyname IS NOT NULL")
 
-use Rack::Cors do
-  allow do
-    origins '*'
-    resource '*', :headers => :any, :methods => :get
+
+connection = Faraday.new(url: url.to_s)
+response = connection.get
+
+collection = JSON.parse(response.body)
+  
+  features = collection.map do |record|
+    time = Time.iso8601(record['issueddate'])
+title =
+      "#{Time.iso8601(record['issueddate']).strftime("%Y/%m/%d  %I:%M %p")} - A new building permit (#{record['applicationnumber']}) has been issued at #{record['deliveryaddress']} to #{record['companyname']}."
+
+  {
+    'id' => record['applicationnumber'],
+    'type' => 'Feature',
+    'properties' => record.merge('title' => title),
+    'geometry' => record['location_1']
+  }
   end
-end
-
-SpyGlass::Registry.each do |glass|
-  get(glass.path) do
-    content_type glass.content_type
-    glass.cooked
-  end
-
-  get(glass.raw_path) do
-    content_type glass.content_type
-    glass.raw
-  end
-end
-
-services = JSON.pretty_generate(services: SpyGlass::Registry.map(&:to_h))
-
-get '/services' do
+  
   content_type :json
-  services
-end
-
-get '/' do
-  erb :index
+  JSON.pretty_generate('type' => 'FeatureCollection', 'features' => features)
 end
