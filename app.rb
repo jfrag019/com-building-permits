@@ -16,20 +16,6 @@ get '/building-permits' do
 		" AND issueddate IS NOT NULL"+
 		" AND deliveryaddress IS NOT NULL"+
 		" AND companyname IS NOT NULL")
-	
-get '/test-permits' do
-	url = URI('https://data.miamigov.com/resource/8vfk-ducx.json')
-	thisWeek = Date.today-7
-	url.query = Faraday::Utils.build_query(
-		'$order' => 'applicationnumber DESC',
-    		'$limit' => 1000,
-		'$where' => "applicationnumber IS NOT NULL" +
-		" AND statusdate IS NOT NULL" +
-		" AND statusdate > '#{thisWeek.iso8601}'" +
-		" AND buildingpermitstatusdescription = 'Active'"+
-		" AND issueddate IS NOT NULL"+
-		" AND deliveryaddress IS NOT NULL"+
-		" AND companyname IS NOT NULL")
 
 connection = Faraday.new(url: url.to_s)
 response = connection.get
